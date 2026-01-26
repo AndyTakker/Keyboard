@@ -1,0 +1,19 @@
+{
+  "name": "Keyboard",
+  "version": "1.0.0",
+  "description": "Keyboard access for CH32V003 and WCH RISC-V MCUs.",
+  "keywords": ["key", "keyboard", "CH32V003", "WCH", "RISC-V", "bare-metal"],
+  "authors": {
+    "name": "A. Kolesov",
+    "maintainer": true
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndyTakker/Keyboard.git"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/AndyTakker/Keyboard",
+  "frameworks": "*",
+  "platforms": ["wch-riscv"],
+  "headers": ["Keyboard.hpp"]
+}
