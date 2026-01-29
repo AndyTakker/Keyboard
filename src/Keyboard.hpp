@@ -1,4 +1,4 @@
-//==============================================================================
+//============================================================= (с) A.Kolesov ==
 // Keyboard.hpp
 // Библиотека для работы с клавиатурой.
 // - проверяет нажатие кнопки (под нажатием понимается сигнал высокого или низкого уровня
@@ -16,9 +16,18 @@
 //------------------------------------------------------------------------------
 #pragma once
 
+// Странно, но при использовании библиотеки GPIO, flash растет на 150 байт,
+// а RAM уменьшается на 48 байт.
+// #define USE_GPIO_LIB 
+
+#include <Logs.h>
 #include <ch32v00x_gpio.h>
+#ifdef USE_GPIO_LIB
+#include <gpio.h>
+#endif
 #include <string.h>
 
+#ifndef USE_GPIO_LIB
 namespace {
 
   //==============================================================================
@@ -52,10 +61,14 @@ namespace {
     GPIO_InitStructure.GPIO_Speed = speed;
     GPIO_Init(port, &GPIO_InitStructure);
   };
-}
 
-struct KeyConfig {                          // Конфигурация одной опрашиваемой кнопки
-  GPIO_TypeDef *port;                       // Порт, на котором опрашиваемая кнопка
+}
+#endif
+
+struct KeyConfig { // Конфигурация одной опрашиваемой кнопки
+#ifndef USE_GPIO_LIB
+  GPIO_TypeDef *port; // Порт, на котором опрашиваемая кнопка
+#endif
   uint16_t pin;                             // Пин, на котором опрашиваемая кнопка
   BitAction activeLevel;                    // Bit_RESET или Bit_SET: уровень, который считается нажатием
   const char *name;                         // Название кнопки.
@@ -90,7 +103,16 @@ class Keyboard {
     // Если установлен флаг автоинициализации, то инициализируем порты, на которых кнопки
     if (autoInit) {
       for (size_t i = 0; i < N; ++i) {
+#ifndef USE_GPIO_LIB
         GPIO_PortInit(m_keys[i].port, m_keys[i].pin, m_keys[i].pinMode);
+#else
+        PORT_enable(m_keys[i].pin);
+        if (m_keys[i].pinMode == GPIO_Mode_IPU) {
+          PIN_input_PU(m_keys[i].pin);
+        } else if (m_keys[i].pinMode == GPIO_Mode_IPD) {
+          PIN_input_PD(m_keys[i].pin);
+        }
+#endif
       }
     }
   };
@@ -171,7 +193,11 @@ bool Keyboard<N>::update() {
     KeyState &state = m_states[i]; // Состояние текущей кнопки
 
     // Чтение текущего состояния в терминах нажата/отпущена
+#ifndef USE_GPIO_LIB
     bool raw = (GPIO_ReadInputDataBit(cfg.port, cfg.pin) == cfg.activeLevel);
+#else
+    bool raw = (PIN_read(cfg.pin) == cfg.activeLevel);
+#endif
 
     // Текущее состояние - нажата, а предыдущее - не нажата, фиксируем факт первого нажатия
     if (raw && !state.pressed) {
