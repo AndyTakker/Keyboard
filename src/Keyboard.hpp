@@ -16,60 +16,13 @@
 //------------------------------------------------------------------------------
 #pragma once
 
-// Странно, но при использовании библиотеки GPIO, flash растет на 150 байт,
-// а RAM уменьшается на 48 байт.
-// #define USE_GPIO_LIB 
-
 #include <Logs.h>
+#include <ch32Pins.hpp>
 #include <ch32v00x_gpio.h>
-#ifdef USE_GPIO_LIB
-#include <gpio.h>
-#endif
 #include <string.h>
 
-#ifndef USE_GPIO_LIB
-namespace {
-
-  //==============================================================================
-  // Функция позволяет настроить один конкретный порт в более-менее естественном
-  // стиле, с однократным описанием и без необходимости помнить вызовы всего нужного.
-  // Например:
-  //   GPIO_PortInit(GPIOD, GPIO_Pin_7, GPIO_Mode_Out_OD);
-  //
-  // Режимы GPIO:
-  // - GPIO_Mode_IN_FLOATING   → вход без подтяжки
-  // - GPIO_Mode_IPU           → вход с подтяжкой к VCC
-  // - GPIO_Mode_IPD           → вход с подтяжкой к GND
-  // - GPIO_Mode_AIN           → аналоговый вход
-  // - GPIO_Mode_Out_OD        → выход с открытым стоком
-  // - GPIO_Mode_Out_PP        → выход push-pull
-  // - GPIO_Mode_AF_OD         → альтернативная функция OD ← I2C!
-  // - GPIO_Mode_AF_PP         → альтернативная функция PP
-  //------------------------------------------------------------------------------
-  void GPIO_PortInit(GPIO_TypeDef *port, uint16_t pin, GPIOMode_TypeDef mode, GPIOSpeed_TypeDef speed = GPIO_Speed_30MHz) {
-    GPIO_InitTypeDef GPIO_InitStructure = {0};
-
-    if (port == GPIOA) {
-      RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
-    } else if (port == GPIOC) {
-      RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
-    } else if (port == GPIOD) {
-      RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOD, ENABLE);
-    }
-    GPIO_InitStructure.GPIO_Pin = pin;
-    GPIO_InitStructure.GPIO_Mode = mode;
-    GPIO_InitStructure.GPIO_Speed = speed;
-    GPIO_Init(port, &GPIO_InitStructure);
-  };
-
-}
-#endif
-
-struct KeyConfig { // Конфигурация одной опрашиваемой кнопки
-#ifndef USE_GPIO_LIB
-  GPIO_TypeDef *port; // Порт, на котором опрашиваемая кнопка
-#endif
-  uint16_t pin;                             // Пин, на котором опрашиваемая кнопка
+struct KeyConfig {                          // Конфигурация одной опрашиваемой кнопки
+  PinName pinName;                          // Пин, на котором опрашиваемая кнопка
   BitAction activeLevel;                    // Bit_RESET или Bit_SET: уровень, который считается нажатием
   const char *name;                         // Название кнопки.
   uint32_t holdTimeMs;                      // Порог долгого нажатия (мс)
@@ -103,16 +56,7 @@ class Keyboard {
     // Если установлен флаг автоинициализации, то инициализируем порты, на которых кнопки
     if (autoInit) {
       for (size_t i = 0; i < N; ++i) {
-#ifndef USE_GPIO_LIB
-        GPIO_PortInit(m_keys[i].port, m_keys[i].pin, m_keys[i].pinMode);
-#else
-        PORT_enable(m_keys[i].pin);
-        if (m_keys[i].pinMode == GPIO_Mode_IPU) {
-          PIN_input_PU(m_keys[i].pin);
-        } else if (m_keys[i].pinMode == GPIO_Mode_IPD) {
-          PIN_input_PD(m_keys[i].pin);
-        }
-#endif
+        pinMode(m_keys[i].pinName, m_keys[i].pinMode);
       }
     }
   };
@@ -193,11 +137,7 @@ bool Keyboard<N>::update() {
     KeyState &state = m_states[i]; // Состояние текущей кнопки
 
     // Чтение текущего состояния в терминах нажата/отпущена
-#ifndef USE_GPIO_LIB
-    bool raw = (GPIO_ReadInputDataBit(cfg.port, cfg.pin) == cfg.activeLevel);
-#else
-    bool raw = (PIN_read(cfg.pin) == cfg.activeLevel);
-#endif
+    bool raw = (pinRead(cfg.pinName) == cfg.activeLevel);
 
     // Текущее состояние - нажата, а предыдущее - не нажата, фиксируем факт первого нажатия
     if (raw && !state.pressed) {

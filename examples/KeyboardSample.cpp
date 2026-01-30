@@ -19,11 +19,6 @@
 //    получить текущее состояние всех опрашиваемых кнопок в деталях и затем
 //    анализировать их комбинации.
 //------------------------------------------------------------------------------
-
-// Странно, но при использовании библиотеки GPIO, flash растет на 150 байт,
-// а RAM уменьшается на 48 байт.
-// #define USE_GPIO_LIB  // Раскомментировать, если есть желание описывать порты в Arduino-style
-
 #include <Keyboard.hpp>
 #include <Logs.h>
 #include <SysClock.h>
@@ -31,13 +26,8 @@
 
 // Конфигурация опрашиваемых кнопок
 static const KeyConfig keys[] = {
-#ifdef USE_GPIO_LIB
     {PD3, Bit_RESET, "UP", 1000},
     {PD2, Bit_RESET, "DOWN", 800}};
-#else
-    {GPIOD, GPIO_Pin_3, Bit_RESET, "UP", 1000},
-    {GPIOD, GPIO_Pin_2, Bit_RESET, "DOWN", 800}};
-#endif
 
 const uint8_t countKeys = sizeof(keys) / sizeof(keys[0]);         // Количество опрашиваемых кнопок
 static Keyboard<countKeys> keyboard(keys, Sysclock.Millis, true); // Создаем экземпляр Keyboard с указанными кнопками
@@ -72,7 +62,6 @@ int main() {
   while (1) {
     if (keyboard.update()) { // Опрашиваем клавиатуру
       logs("Keyboard update\r\n");
-      // logs("PD2: %d PD3: %d \r\n",  PIN_read(PD2), PIN_read(PD3));
 
       // Пример ниже можно использовать вместо коллбека или вместе с ним.
       // для более изощренных обработок
