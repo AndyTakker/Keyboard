@@ -17,6 +17,7 @@
 #pragma once
 
 #include <Logs.h>
+#include <array>
 #include <ch32Pins.hpp>
 #include <ch32v00x_gpio.h>
 #include <string.h>
@@ -24,7 +25,7 @@
 struct KeyConfig {                          // Конфигурация одной опрашиваемой кнопки
   PinName pinName;                          // Пин, на котором опрашиваемая кнопка
   BitAction activeLevel;                    // Bit_RESET или Bit_SET: уровень, который считается нажатием
-  const char *name;                         // Название кнопки.
+  uint8_t id;                               // Уникальный идентификатор кнопки.
   uint32_t holdTimeMs;                      // Порог долгого нажатия (мс)
   GPIOMode_TypeDef pinMode = GPIO_Mode_IPU; // Режим пина по умолчанию
 };
@@ -32,13 +33,13 @@ struct KeyConfig {                          // Конфигурация одно
 // Класс для передачи параметров в обработчик нажатия кнопки.
 class KeyEvent {
   public:
-  const char *name;       // Имя кнопки
+  uint8_t id;             // Уникальный идентификатор кнопки.
   bool isLongPress;       // Флаг долгого нажатия
-  uint32_t pressDuration; // фактическое время удержания
+  uint32_t pressDuration; // Фактическое время удержания
 };
 
 struct KeyStatus {        // Структура для запроса состояний кнопок
-  const char *name;       // Имя кнопки
+  uint8_t id;             // Уникальный идентификатор кнопки
   bool isPressed;         // устойчивое состояние (после debounce)
   bool isLongPress;       // удерживается дольше holdTimeMs
   uint32_t pressDuration; // если pressed == true
@@ -51,8 +52,13 @@ using KeyCallback = void (*)(const KeyEvent &);
 template <size_t N>
 class Keyboard {
   public:
+  // const uint8_t countKeys = N;        // Количество опрашиваемых кнопок - вместо нее statuses_.size()
+  std::array<KeyStatus, N> statuses_; // Создаем сразу массив для состояний всех кнопок
+                                      // и его будем по запросу заполнять и возвращать
+
   Keyboard(const KeyConfig (&keys)[N], uint32_t (*getMillis)(), bool autoInit = true)
       : m_keys(keys), m_getMillis(getMillis) {
+
     // Если установлен флаг автоинициализации, то инициализируем порты, на которых кнопки
     if (autoInit) {
       for (size_t i = 0; i < N; ++i) {
@@ -65,9 +71,9 @@ class Keyboard {
   void setDebounce(uint32_t debounceMs) { m_debounceMs = debounceMs; };
   void setCallback(KeyCallback cb) { m_callback = cb; }
 
-  bool isPressed(const char *keyName) const {
+  bool isPressed(uint8_t keyId) const {
     for (size_t i = 0; i < N; ++i) {
-      if (m_keys[i].name && keyName && strcmp(m_keys[i].name, keyName) == 0) {
+      if (m_keys[i].id == keyId) {
         return m_states[i].pressed;
       }
     }
@@ -84,19 +90,21 @@ class Keyboard {
   }
 
   // Функция возвращает статус всех опрашиваемых кнопок
-  void getStatus(KeyStatus (&out)[N]) const {
+  std::array<KeyStatus, N> getStatus() {
     uint32_t now = m_getMillis();
-    for (size_t i = 0; i < N; ++i) {
-      out[i].name = m_keys[i].name;
-      out[i].isPressed = m_states[i].pressed;
+    // for (size_t i = 0; i < N; ++i) {
+    for (uint8_t i = 0; i < statuses_.size(); ++i) {
+      statuses_[i].id = m_keys[i].id;
+      statuses_[i].isPressed = m_states[i].pressed;
       if (m_states[i].pressed) {
-        out[i].pressDuration = now - m_states[i].pressTime;
-        out[i].isLongPress = (out[i].pressDuration >= m_keys[i].holdTimeMs);
+        statuses_[i].pressDuration = now - m_states[i].pressTime;
+        statuses_[i].isLongPress = (statuses_[i].pressDuration >= m_keys[i].holdTimeMs);
       } else {
-        out[i].pressDuration = 0;
-        out[i].isLongPress = false;
+        statuses_[i].pressDuration = 0;
+        statuses_[i].isLongPress = false;
       }
     }
+    return statuses_;
   }
 
   private:
@@ -154,7 +162,7 @@ bool Keyboard<N>::update() {
       bool isLong = (duration >= cfg.holdTimeMs); // Флаг долгого нажатия
       anyKeyChanged = true;
       if (m_callback) {
-        m_callback({cfg.name, isLong, duration});
+        m_callback({cfg.id, isLong, duration});
       }
       continue; // К следующей кнопке
     }

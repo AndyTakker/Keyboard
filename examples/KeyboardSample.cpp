@@ -24,10 +24,13 @@
 #include <SysClock.h>
 #include <debug.h>
 
+enum class KeyId : uint8_t { UP = 0,
+                             DOWN };
+
 // Конфигурация опрашиваемых кнопок
 static const KeyConfig keys[] = {
-    {PD3, Bit_RESET, "UP", 1000},
-    {PD2, Bit_RESET, "DOWN", 800}};
+    {PD3, Bit_RESET, (uint8_t)KeyId::UP, 1000},
+    {PD2, Bit_RESET, (uint8_t)KeyId::DOWN, 800}};
 
 const uint8_t countKeys = sizeof(keys) / sizeof(keys[0]);         // Количество опрашиваемых кнопок
 static Keyboard<countKeys> keyboard(keys, Sysclock.Millis, true); // Создаем экземпляр Keyboard с указанными кнопками
@@ -36,14 +39,14 @@ static Keyboard<countKeys> keyboard(keys, Sysclock.Millis, true); // Созда�
 void onKeyEvent(const KeyEvent &e) {
   // Для указанной кнопки проверяем, как долго она была нажата
   if (e.isLongPress) {
-    logs("LONG (%lu ms): %s\n", e.pressDuration, e.name);
+    logs("LONG (%lu ms): %d\n", e.pressDuration, e.id);
   } else {
-    logs("TAP (%lu ms): %s\n", e.pressDuration, e.name);
+    logs("TAP (%lu ms): %d\n", e.pressDuration, e.id);
   }
   // А это пример проверки на модификатор, при отпускании интересующей нас кнопки
   // не была ли нажата клавиша-модификатор (Shift, Alt, Ctrl)
   // (в данном примере модификатор - это UP)
-  if (keyboard.isPressed("UP")) {
+  if (keyboard.isPressed((uint8_t)KeyId::UP)) {
     logs("UP_pressed\n");
   }
 }
@@ -65,15 +68,15 @@ int main() {
 
       // Пример ниже можно использовать вместо коллбека или вместе с ним.
       // для более изощренных обработок
-      KeyStatus statuses[countKeys]; // Массив статусов
-      keyboard.getStatus(statuses);  // Получаем статусы
+      auto statuses = keyboard.getStatus();
+
       // Анализируем текущее состояние всех кнопок (уже с учетом антидребезга)
       // Пример-1: одновременное нажатие UP + DOWN
       bool upPressed = false, downPressed = false;
       for (auto &s : statuses) {
-        if (strcmp(s.name, "UP") == 0)
+        if (s.id == (uint8_t)KeyId::UP)
           upPressed = s.isPressed;
-        if (strcmp(s.name, "DOWN") == 0)
+        if (s.id == (uint8_t)KeyId::DOWN)
           downPressed = s.isPressed;
       }
       if (upPressed && downPressed) {
@@ -82,7 +85,7 @@ int main() {
       // Пример-2: долгое удержание DOWN во время нажатия UP
       bool downHeldLong = false;
       for (auto &s : statuses) {
-        if (strcmp(s.name, "DOWN") == 0)
+        if (s.id == (uint8_t)KeyId::DOWN)
           downHeldLong = s.isLongPress;
       }
       if (upPressed && downHeldLong) {
