@@ -60,7 +60,7 @@ int main() {
   logs("SystemClk: %lu\r\n", SystemCoreClock);        // Для посмотреть частоту процесора (48мГц)
   logs("   ChipID: 0x%08lX\r\n", DBGMCU_GetCHIPID()); // Для посмотреть ID чипа, от нефиг делать
 
-  // keyboard.setCallback(onKeyEvent); // Подключить обработчик
+  keyboard.setCallback(onKeyEvent); // Подключить обработчик
   keyboard.clear(); // Очистить состояние кнопок. Все будут ненажаты. Это для примера.
   while (1) {
     if (keyboard.update()) { // Опрашиваем клавиатуру
@@ -69,14 +69,12 @@ int main() {
       // Пример ниже можно использовать вместо коллбека или вместе с ним.
       // для более изощренных обработок
       auto statuses = keyboard.getStatus();
-      // for (size_t i = 0; i < countKeys; ++i) {
-      //   logs("Id: %d, Pressed: %d, Duration: %d, LongPress: %d\r\n", statuses[i].id, statuses[i].isPressed, statuses[i].pressDuration, statuses[i].isLongPress);
-      // }
-      uint8_t i = 0;
+      // В исследовательских целях выведем состояние клавиш
       for (auto &s : statuses) {
-        logs("Id: %d, Pressed: %d, Duration: %d, LongPress: %d\r\n", s.id, s.isPressed, s.pressDuration, s.isLongPress);
-        i++;
+        logs("Id: %d, Pressed: %d, Duration: %ld, LongPress: %d\r\n", s.id, s.isPressed, s.pressDuration, s.isLongPress);
       }
+
+      // Второй вариант вызова функции для получения статусов
       // KeyStatus statuses[countKeys]; // Массив статусов
       // keyboard.getStatus(statuses);  // Получаем статусы
 

@@ -52,7 +52,6 @@ using KeyCallback = void (*)(const KeyEvent &);
 template <size_t N>
 class Keyboard {
   public:
-  // const uint8_t countKeys = N;        // Количество опрашиваемых кнопок - вместо нее statuses_.size()
   std::array<KeyStatus, N> statuses_; // Создаем сразу массив для состояний всех кнопок
                                       // и его будем по запросу заполнять и возвращать
 
@@ -92,7 +91,6 @@ class Keyboard {
   // Функция возвращает статус всех опрашиваемых кнопок
   std::array<KeyStatus, N> getStatus() {
     uint32_t now = m_getMillis();
-    // for (size_t i = 0; i < N; ++i) {
     for (uint8_t i = 0; i < statuses_.size(); ++i) {
       statuses_[i].id = m_keys[i].id;
       statuses_[i].isPressed = m_states[i].pressed;
@@ -103,12 +101,13 @@ class Keyboard {
         statuses_[i].pressDuration = 0;
         statuses_[i].isLongPress = false;
       }
-      // logs("Id: %d, Pressed: %d, Duration: %d, LongPress: %d\r\n", statuses_[i].id, statuses_[i].isPressed, statuses_[i].pressDuration, statuses_[i].isLongPress);
     }
     return statuses_;
   }
 
   // Функция возвращает статус всех опрашиваемых кнопок
+  // Аналог предыдущей функции, но заполняет данными полученный в параметре массив.
+  // Менее удобная, но мало-ли.
   void getStatus(KeyStatus (&out)[N]) const {
     uint32_t now = m_getMillis();
     for (size_t i = 0; i < N; ++i) {
@@ -158,17 +157,10 @@ bool Keyboard<N>::update() {
   // проверяем ее состояние в предыдущем опросе. Если оно изменилось, значит действительно,
   // клавиша была нажата и отпущена. Значит ее код нужно вернуть.
   for (size_t i = 0; i < N; ++i) { // Перебираем все кнопки
-    // const auto &cfg = m_keys[i];   // Конфигурация текущей кнопки
-    // KeyState &state = m_states[i]; // Состояние текущей кнопки
-
     // Чтение текущего состояния в терминах нажата/отпущена
     bool raw = (pinRead(m_keys[i].pinName) == m_keys[i].activeLevel);
-    // if (raw) {
-    //   logs("Key %d: %s\r\n", m_keys[i].id, raw ? "pressed" : "released");
-    // }
     // Текущее состояние - нажата, а предыдущее - не нажата, фиксируем факт первого нажатия
     if (raw && !m_states[i].pressed) {
-      logs("Key %d: %s\r\n", m_keys[i].id, "1st pressed");
       m_states[i].pressed = raw;   // Фиксируем факт нажатия
       m_states[i].pressTime = now; // и время нажатия
       anyKeyChanged = true;
@@ -177,7 +169,6 @@ bool Keyboard<N>::update() {
 
     // Была нажата, но сейчас отпущена
     if (!raw && m_states[i].pressed) {
-      logs("Key %d: %s\r\n", m_keys[i].id, "released");
       m_states[i].pressed = raw;                        // Фиксируем факт отпускания
       uint32_t duration = now - m_states[i].pressTime;  // Время удержания
       bool isLong = (duration >= m_keys[i].holdTimeMs); // Флаг долгого нажатия
