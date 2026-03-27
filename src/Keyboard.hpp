@@ -13,21 +13,42 @@
 // При инициализации класса нужно передать указатель на функцию, которая будет
 // возвращать текущее время в миллисекундах. Можно ипользовать функцию Sysclock.Millis
 // из библиотеки SysClock или любую другую.
+// 
+// Добавлена подержка Arduino-framework.
 //------------------------------------------------------------------------------
 #pragma once
 
 #include <Logs.h>
+#include <string.h>
+
+#ifndef ARDUINO
 #include <array>
 #include <ch32Pins.hpp>
 #include <ch32v00x_gpio.h>
-#include <string.h>
+#else
+#include <Arduino.h>
+#define PinName uint8_t
+#define BitAction bool
+#define Bit_RESET false
+#define Bit_SET true
+#define pinRead(x) digitalRead(x)
+#endif
 
-struct KeyConfig {                          // Конфигурация одной опрашиваемой кнопки
-  PinName pinName;                          // Пин, на котором опрашиваемая кнопка
-  BitAction activeLevel;                    // Bit_RESET или Bit_SET: уровень, который считается нажатием
-  uint8_t id;                               // Уникальный идентификатор кнопки.
-  uint32_t holdTimeMs;                      // Порог долгого нажатия (мс)
+struct KeyConfig { // Конфигурация одной опрашиваемой кнопки
+#ifndef ARDUINO
+  PinName pinName;       // Пин, на котором опрашиваемая кнопка
+  BitAction activeLevel; // Bit_RESET или Bit_SET: уровень, который считается нажатием
+#else
+  uint8_t pinName;  // Пин, на котором опрашиваемая кнопка
+  bool activeLevel; // Bit_RESET или Bit_SET: уровень, который считается нажатием
+#endif
+  uint8_t id;          // Уникальный идентификатор кнопки.
+  uint32_t holdTimeMs; // Порог долгого нажатия (мс)
+#ifndef ARDUINO
   GPIOMode_TypeDef pinMode = GPIO_Mode_IPU; // Режим пина по умолчанию
+#else
+  uint8_t pinMode; // = INPUT_PULLUP; // Режим пина по умолчанию для arduino не поддерживается
+#endif
 };
 
 // Класс для передачи параметров в обработчик нажатия кнопки.
@@ -51,10 +72,15 @@ using KeyCallback = void (*)(const KeyEvent &);
 
 template <size_t N>
 class Keyboard {
-  public:
-  std::array<KeyStatus, N> statuses_; // Создаем сразу массив для состояний всех кнопок
-                                      // и его будем по запросу заполнять и возвращать
-
+  private:
+  // Создаем сразу массив для состояний всех кнопок и его будем по запросу
+  // заполнять и возвращать (для не-ардуино).
+#ifndef ARDUINO
+  std::array<KeyStatus, N> statuses_;
+#else
+  KeyStatus statuses[N];
+#endif
+public:
   Keyboard(const KeyConfig (&keys)[N], uint32_t (*getMillis)(), bool autoInit = true)
       : m_keys(keys), m_getMillis(getMillis) {
 
@@ -84,10 +110,11 @@ class Keyboard {
     for (size_t i = 0; i < N; ++i) {
       m_states[i].pressed = false;
       m_states[i].pressTime = 0;
-      lastRead = 0;
     }
+    lastRead = 0;
   }
 
+#ifndef ARDUINO
   // Функция возвращает статус всех опрашиваемых кнопок
   std::array<KeyStatus, N> getStatus() {
     uint32_t now = m_getMillis();
@@ -104,6 +131,7 @@ class Keyboard {
     }
     return statuses_;
   }
+#endif
 
   // Функция возвращает статус всех опрашиваемых кнопок
   // Аналог предыдущей функции, но заполняет данными полученный в параметре массив.
